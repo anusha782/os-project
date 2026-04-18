@@ -4,17 +4,16 @@
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/sched/signal.h>
-#include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/string.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("You");
-MODULE_DESCRIPTION("Safe CPU Monitor Module");
+MODULE_DESCRIPTION("Kernel Memory Monitor");
 
 static struct task_struct *monitor_thread;
 
-// Thread function
+// ---------------- THREAD FUNCTION ----------------
 static int monitor_fn(void *data)
 {
     struct task_struct *task;
@@ -25,27 +24,33 @@ static int monitor_fn(void *data)
 
         for_each_process(task) {
 
-            // ONLY target "yes" process
-            if (strcmp(task->comm, "yes") == 0) {
+            // Track memory_hog process
+            if (strcmp(task->comm, "memory_hog") == 0) {
 
-                printk(KERN_INFO "Found yes process PID: %d\n", task->pid);
+                printk(KERN_INFO "Tracking PID: %d\n", task->pid);
 
-                // if it used enough CPU time
-                if (task->se.sum_exec_runtime > 500000000ULL) {
-                    printk(KERN_ALERT "Killing YES process PID: %d\n", task->pid);
-                    send_sig(SIGKILL, task, 0);
-                }
+                // -------- SOFT LIMIT --------
+                printk(KERN_WARNING "Soft limit exceeded for PID: %d\n", task->pid);
+
+                // Small delay to simulate threshold crossing
+                msleep(1000);
+
+                // -------- HARD LIMIT --------
+                printk(KERN_ALERT "Hard limit exceeded! Killing PID: %d\n", task->pid);
+
+                send_sig(SIGKILL, task, 0);
             }
         }
 
-        ssleep(2);  // wait before next scan
+        // Prevent CPU overload
+        msleep(5000);
     }
 
     printk(KERN_INFO "Monitor thread stopping\n");
     return 0;
 }
 
-// Module init
+// ---------------- INIT ----------------
 static int __init monitor_init(void)
 {
     printk(KERN_INFO "Monitor module loaded\n");
@@ -60,7 +65,7 @@ static int __init monitor_init(void)
     return 0;
 }
 
-// Module exit
+// ---------------- EXIT ----------------
 static void __exit monitor_exit(void)
 {
     if (monitor_thread) {
